@@ -1,0 +1,281 @@
+:root {
+  --bg-gradient-top: #1E293B;
+  /* Глубокий синий сланец */
+  --bg-gradient-bottom: #2563EB;
+  /* Насыщенный королевский синий */
+  --bg-card: #ffffff;
+  --bg-glass: rgba(255, 255, 255, 0.95);
+  --accent-blue: #3B82F6;
+  --accent-cyan: #06B6D4;
+  --accent-green: #10B981;
+  --accent-red: #EF4444;
+  --accent-gold: #F59E0B;
+  --text-primary: #1E293B;
+  /* Темно-синий текст */
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
+  --border-color: rgba(37, 99, 235, 0.1);
+  --brand-gradient: linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%);
+  --shadow-glow: 0 10px 40px rgba(37, 99, 235, 0.2);
+  --font-main: 'Plus Jakarta Sans', sans-serif;
+  --font-display: 'Outfit', sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  background: #1E293B;
+}
+
+body {
+  background: linear-gradient(180deg, var(--bg-gradient-top) 0%, var(--bg-gradient-bottom) 100%);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  line-height: 1.5;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Глобальный контейнер */
+.app-container {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+  padding-bottom: 100px;
+}
+
+/* Стили заголовков */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Навигация (Glassmorphism) */
+.nav-bar {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  /* backdrop-filter: blur(20px); -- Disabled for performance */
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+  z-index: 1000;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.nav-item {
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex: 1;
+}
+
+.nav-item.active {
+  color: var(--accent-blue);
+  transform: translateY(-2px);
+}
+
+.nav-item.active svg {
+  filter: drop-shadow(0 0 8px rgba(37, 99, 235, 0.4));
+}
+
+/* Карточки и Инпуты */
+.card {
+  background: #ffffff;
+  /* backdrop-filter: blur(12px); -- Disabled for performance */
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 24px;
+  margin: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.input-field {
+  background: rgba(0, 0, 0, 0.05);
+  /* Легкий серый фон для полей на белом */
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s;
+}
+
+.input-field:focus-within {
+  border-color: var(--accent-blue);
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.input-field input,
+.input-field textarea {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  /* Черный текст */
+  font-size: 16px;
+  width: 100%;
+  outline: none;
+  font-family: var(--font-main);
+  caret-color: var(--accent-blue);
+}
+
+/* Кнопки */
+button.primary {
+  background: var(--brand-gradient);
+  color: #fff;
+  border: none;
+  padding: 16px;
+  border-radius: 16px;
+  font-weight: 700;
+  font-size: 16px;
+  font-family: var(--font-display);
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 15px rgba(123, 98, 227, 0.3);
+}
+
+button.primary:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+/* Карта Пути (Тропинка) */
+.path-container {
+  padding: 60px 0;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  position: relative;
+  min-height: 100vh;
+}
+
+.path-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.path-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent, var(--accent-cyan), transparent);
+  opacity: 0.3;
+}
+
+.step-node {
+  width: 72px;
+  height: 72px;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 24px 0;
+  position: relative;
+  z-index: 2;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+.step-card {
+  width: 90%;
+  min-height: 60px;
+  border-radius: 20px;
+  padding: 16px 20px;
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  color: white;
+  text-align: left;
+}
+
+.step-green {
+  background: linear-gradient(135deg, #00eb89 0%, #00c170 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.step-red {
+  background: linear-gradient(135deg, #ff4d4d 0%, #d43d3d 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.step-gold {
+  background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+  border: 2px solid white;
+  box-shadow: 0 0 20px rgba(255, 193, 7, 0.4);
+  color: white;
+}
+
+.step-pending {
+  background: var(--bg-card);
+  border: 2px dashed var(--text-muted);
+  color: var(--text-primary);
+}
+
+.step-node::before,
+.step-card::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 28px;
+  background: inherit;
+  filter: blur(8px);
+  opacity: 0.2;
+  z-index: -1;
+}
+
+/* Анимация загрузки */
+.loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  gap: 8px;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  background: var(--accent-blue);
+  border-radius: 50%;
+  animation: bounce 0.6s infinite alternate;
+}
+
+@keyframes bounce {
+  to {
+    transform: translateY(-10px);
+    opacity: 0.5;
+  }
+}
