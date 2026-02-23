@@ -903,6 +903,54 @@ cron.schedule('0 20 * * *', async () => {
     }
 });
 
+// --- Эндпоинт глобальной статистики платформы ---
+app.get('/api/stats', async (req: Request, res: Response) => {
+    try {
+        const [
+            totalUsers,
+            usersWithGoals,
+            totalGoals,
+            activeGoals,
+            completedGoals,
+            totalSteps,
+            goalsWithSteps
+        ] = await Promise.all([
+            prisma.user.count(),
+            prisma.user.count({ where: { goals: { some: {} } } }),
+            prisma.goal.count(),
+            prisma.goal.count({ where: { status: 'ACTIVE' } }),
+            prisma.goal.count({ where: { status: 'COMPLETED' } }),
+            prisma.step.count(),
+            prisma.goal.findMany({
+                include: { _count: { select: { steps: true } }, user: true },
+                orderBy: { steps: { _count: 'desc' } },
+                take: 1
+            })
+        ]);
+
+        const recordGoal = goalsWithSteps[0] || null;
+
+        res.json({
+            totalUsers,
+            usersWithGoals,
+            usersWithoutGoals: totalUsers - usersWithGoals,
+            totalGoals,
+            activeGoals,
+            completedGoals,
+            totalSteps,
+            recordGoal: recordGoal ? {
+                description: recordGoal.description,
+                stepsCount: recordGoal._count.steps,
+                username: recordGoal.user?.username || null,
+                firstName: recordGoal.user?.firstName || null
+            } : null
+        });
+    } catch (e) {
+        console.error('Stats error:', e);
+        res.status(500).json({ error: 'Ошибка получения статистики' });
+    }
+});
+
 // Эндпоинт для Vercel Cron (внешний вызов проверки дедлайнов)
 app.get('/api/cron/check-goals', async (req: Request, res: Response) => {
     try {

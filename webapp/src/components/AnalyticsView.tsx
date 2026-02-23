@@ -1,9 +1,20 @@
-import { useState } from 'react';
-import { Trophy } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Trophy, Users, Target, CheckCircle, Footprints, TrendingUp } from 'lucide-react';
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://shag-bot.vercel.app/api';
 
 // --- ВИД: Аналитика ---
 const AnalyticsView = ({ user }: any) => {
     const [range, setRange] = useState<'MONTH' | 'ALL'>('MONTH');
+    const [stats, setStats] = useState<any>(null);
+    const [loadingStats, setLoadingStats] = useState(true);
+
+    useEffect(() => {
+        fetch(`${API_URL}/stats`)
+            .then(r => r.json())
+            .then(data => { setStats(data); setLoadingStats(false); })
+            .catch(() => setLoadingStats(false));
+    }, []);
 
     // Собираем все шаги всех целей
     const allSteps = user?.goals?.flatMap((g: any) => g.steps.map((s: any) => ({ ...s, goalTitle: g.description }))) || [];
@@ -24,15 +35,117 @@ const AnalyticsView = ({ user }: any) => {
     const yellow = filteredSteps.filter((s: any) => s.evaluation === 'YELLOW').length;
     const total = green + red + yellow;
 
+    const StatCard = ({ icon, label, value, color, sub }: any) => (
+        <div style={{
+            background: 'white', borderRadius: 16, padding: '16px 18px',
+            display: 'flex', alignItems: 'center', gap: 14,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.06)'
+        }}>
+            <div style={{
+                width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color
+            }}>
+                {icon}
+            </div>
+            <div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1.1 }}>{value}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>{label}</div>
+                {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
+            </div>
+        </div>
+    );
+
     return (
         <div style={{ paddingBottom: 20 }}>
+
+            {/* === ГЛОБАЛЬНАЯ СТАТИСТИКА ПЛАТФОРМЫ === */}
+            <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: 'white', marginBottom: 14, paddingLeft: 2 }}>
+                    📊 Статистика платформы
+                </h3>
+
+                {loadingStats ? (
+                    <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
+                        Загрузка...
+                    </div>
+                ) : stats ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            <StatCard
+                                icon={<Users size={20} />}
+                                label="Пользователей"
+                                value={stats.totalUsers}
+                                color="#3B82F6"
+                                sub="зарегистрировано"
+                            />
+                            <StatCard
+                                icon={<TrendingUp size={20} />}
+                                label="Поставили цель"
+                                value={stats.usersWithGoals}
+                                color="#10B981"
+                                sub={`из ${stats.totalUsers} (${stats.totalUsers > 0 ? Math.round(stats.usersWithGoals / stats.totalUsers * 100) : 0}%)`}
+                            />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            <StatCard
+                                icon={<Target size={20} />}
+                                label="Целей всего"
+                                value={stats.totalGoals}
+                                color="#8B5CF6"
+                                sub={`${stats.activeGoals} активных`}
+                            />
+                            <StatCard
+                                icon={<CheckCircle size={20} />}
+                                label="Завершено"
+                                value={stats.completedGoals}
+                                color="#10B981"
+                                sub="целей выполнено"
+                            />
+                        </div>
+                        <StatCard
+                            icon={<Footprints size={20} />}
+                            label="Шагов сделано"
+                            value={stats.totalSteps}
+                            color="#F59E0B"
+                            sub="на всей платформе"
+                        />
+                        {stats.recordGoal && (
+                            <div style={{
+                                background: 'linear-gradient(135deg, #fef3c7, #fff7ed)',
+                                borderRadius: 16, padding: '14px 18px',
+                                border: '1px solid rgba(245, 158, 11, 0.2)',
+                                display: 'flex', gap: 12, alignItems: 'center'
+                            }}>
+                                <div style={{ fontSize: 28 }}>🏆</div>
+                                <div>
+                                    <div style={{ fontSize: 12, fontWeight: 800, color: '#D97706', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                        Рекордсмен
+                                    </div>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: '#92400E', marginTop: 2 }}>
+                                        {stats.recordGoal.firstName || stats.recordGoal.username || 'Аноним'}
+                                    </div>
+                                    <div style={{ fontSize: 12, color: '#B45309' }}>
+                                        «{stats.recordGoal.description}» — {stats.recordGoal.stepsCount} шагов
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+                        Не удалось загрузить данные
+                    </div>
+                )}
+            </div>
+
+            {/* === ЛИЧНАЯ АНАЛИТИКА === */}
             <div className="card" style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: 8, borderRadius: 12, color: '#10B981' }}>
                             <Trophy size={24} />
                         </div>
-                        <h2 style={{ fontSize: 22, fontWeight: 800 }}>Аналитика</h2>
+                        <h2 style={{ fontSize: 18, fontWeight: 800 }}>Мои шаги</h2>
                     </div>
 
                     <div style={{ display: 'flex', background: '#f1f5f9', padding: 4, borderRadius: 12 }}>
@@ -89,7 +202,7 @@ const AnalyticsView = ({ user }: any) => {
                 </div>
             </div>
 
-            {/* Детализация по целям (если была активность) */}
+            {/* Детализация по целям */}
             {filteredSteps.length > 0 && (
                 <div className="card">
                     <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Последние действия</h3>
