@@ -1,7 +1,8 @@
 # Скрипт для быстрой настройки Telegram Bot Webhook
 
 $BOT_TOKEN = "7700333505:AAFBkHJuyMNzusPDCa-p6rrYymytm3OJ_Jo"
-$WEBHOOK_URL = "https://aura-psi-two.vercel.app"
+# ВАЖНО: Вместо 'aura-psi-two.vercel.app' подставь URL своего бэкенда с Vercel
+$WEBHOOK_URL = "https://aura-psi-two.vercel.app/api/bot"
 
 Write-Host "🔧 Настройка Telegram Bot Webhook..." -ForegroundColor Cyan
 

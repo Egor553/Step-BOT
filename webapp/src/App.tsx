@@ -6,7 +6,7 @@ import axios from 'axios';
 import AnalyticsView from './components/AnalyticsView';
 // import { AuthView } from './AuthView'; // BACKUP - авторизация отключена
 
-const API_URL = '/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 type Step = { id: number; content: string; evaluation: string; isKey: boolean; createdAt: string };
 type Goal = { id: number; description: string; steps: Step[]; deadline: string; duration: number; status: string; startDate: string };
