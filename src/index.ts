@@ -115,15 +115,14 @@ bot.action('download_ideas', async (ctx) => {
 
 const app = express();
 
-// CORS настройки для работы с frontend
 app.use(cors({
-    origin: [
-        'https://admin-topaz-seven.vercel.app',
-        'https://admin-r1n4bzxc7-egors-projects-333b7681.vercel.app',
-        'https://aura-psi-two.vercel.app',
-        'http://localhost:5173',
-        'http://localhost:3000'
-    ],
+    origin: (origin, callback) => {
+        if (!origin || origin.endsWith('.vercel.app') || origin.includes('localhost')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']

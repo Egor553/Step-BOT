@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Trophy, Users, Target, CheckCircle, Footprints, TrendingUp } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://shag-bot.vercel.app/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 // --- ВИД: Аналитика ---
 const AnalyticsView = ({ user }: any) => {
