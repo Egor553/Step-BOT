@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import WebApp from '@twa-dev/sdk';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Map, CheckCircle2, Briefcase, Phone, Plus, Star, ChevronLeft, Target, Gamepad2, Users, Trophy, Snowflake, Zap, Trash2, MessageSquare, HandHelping, Lightbulb, Clock, LogOut, Gift, Mail, TrendingUp } from 'lucide-react';
+import { User, Map, CheckCircle2, Briefcase, Phone, Plus, Star, ChevronLeft, Target, Gamepad2, Users, Trophy, Snowflake, Zap, Trash2, Edit2, MessageSquare, HandHelping, Lightbulb, Clock, LogOut, Gift, Mail, TrendingUp } from 'lucide-react';
 import axios from 'axios';
 import AnalyticsView from './components/AnalyticsView';
 // import { AuthView } from './AuthView'; // BACKUP - авторизация отключена
@@ -741,6 +741,45 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
         }
     };
 
+    const handleDeleteStep = async (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
+        WebApp.showConfirm('Удалить этот шаг?', async (confirmed) => {
+            if (confirmed) {
+                try {
+                    await axios.delete(`${API_URL}/steps/${id}`);
+                    WebApp.showAlert('Шаг удален 🗑️');
+                    onUpdate();
+                    // Если удаленный шаг был частью выбранной цели, обновляем её данные локально
+                    if (selectedGoal) {
+                        setSelectedGoal({
+                            ...selectedGoal,
+                            steps: selectedGoal.steps.filter((s: any) => s.id !== id)
+                        });
+                    }
+                } catch (e) {
+                    WebApp.showAlert('Ошибка удаления');
+                }
+            }
+        });
+    };
+
+    const handleEditStep = async (id: number, newContent: string) => {
+        try {
+            await axios.put(`${API_URL}/steps/${id}`, { content: newContent });
+            onUpdate();
+            WebApp.HapticFeedback?.notificationOccurred('success');
+            // Обновляем локально
+            if (selectedGoal) {
+                setSelectedGoal({
+                    ...selectedGoal,
+                    steps: selectedGoal.steps.map((s: any) => s.id === id ? { ...s, content: newContent } : s)
+                });
+            }
+        } catch (e) {
+            WebApp.showAlert('Ошибка обновления');
+        }
+    };
+
     if (goals.length === 0) return (
         <div className="card" style={{ marginTop: 60, textAlign: 'center', padding: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
             <div style={{ width: 88, height: 88, borderRadius: 24, background: 'rgba(37, 99, 235, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24, color: 'var(--accent-blue)' }}>
@@ -1008,7 +1047,14 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
                                         }} />
 
                                         {allSteps.map((step: any, idx: number) => (
-                                            <HistoryStepItem key={step.id} step={step} idx={idx} isLast={idx === allSteps.length - 1} />
+                                            <HistoryStepItem
+                                                key={step.id}
+                                                step={step}
+                                                idx={idx}
+                                                isLast={idx === allSteps.length - 1}
+                                                onDelete={handleDeleteStep}
+                                                onEdit={handleEditStep}
+                                            />
                                         ))}
                                     </div>
                                 ) : (
@@ -1041,12 +1087,13 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
 
 
 // --- КОМПОНЕНТ: Элемент истории шага ---
-const HistoryStepItem = ({ step, idx, isLast }: any) => {
+const HistoryStepItem = ({ step, idx, isLast, onDelete, onEdit }: any) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedContent, setEditedContent] = useState(step.content);
 
     let dotColor = '#10B981'; // GREEN
     let bgColor = '#D1FAE5';
-    let icon = null;
 
     if (step.evaluation === 'RED') {
         dotColor = '#EF4444';
@@ -1054,10 +1101,17 @@ const HistoryStepItem = ({ step, idx, isLast }: any) => {
     } else if (step.evaluation === 'YELLOW') {
         dotColor = '#F59E0B';
         bgColor = '#FEF3C7';
-        icon = '⏳';
     }
 
     const isFirst = idx === 0;
+
+    const handleSave = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (editedContent.trim() && editedContent !== step.content) {
+            onEdit(step.id, editedContent);
+        }
+        setIsEditing(false);
+    };
 
     return (
         <motion.div
@@ -1065,8 +1119,10 @@ const HistoryStepItem = ({ step, idx, isLast }: any) => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.04, duration: 0.3 }}
             onClick={() => {
-                setIsOpen(!isOpen);
-                WebApp.HapticFeedback?.impactOccurred('light');
+                if (!isEditing) {
+                    setIsOpen(!isOpen);
+                    WebApp.HapticFeedback?.impactOccurred('light');
+                }
             }}
             style={{
                 display: 'flex', alignItems: 'flex-start', gap: 12,
@@ -1088,9 +1144,7 @@ const HistoryStepItem = ({ step, idx, isLast }: any) => {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 8, color: 'white',
                     transition: 'all 0.3s'
-                }}>
-                    {/* Для желтых можно вставить иконку, но размеры малы. Оставим просто цвет. */}
-                </div>
+                }} />
             </div>
 
             {/* Контент */}
@@ -1102,9 +1156,27 @@ const HistoryStepItem = ({ step, idx, isLast }: any) => {
                     }}>
                         {step.evaluation === 'RED' ? '🔻 Шаг назад' : (step.evaluation === 'YELLOW' ? '⏳ Ожидание' : '🚀 Шаг вперёд')}
                     </span>
-                    <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>
-                        {new Date(step.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>
+                            {new Date(step.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {isOpen && !isEditing && (
+                            <div style={{ display: 'flex', gap: 6 }}>
+                                <div
+                                    onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                                    style={{ padding: 4, color: 'var(--text-muted)' }}
+                                >
+                                    <Edit2 size={12} />
+                                </div>
+                                <div
+                                    onClick={(e) => onDelete(e, step.id)}
+                                    style={{ padding: 4, color: '#EF4444' }}
+                                >
+                                    <Trash2 size={12} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <AnimatePresence initial={false}>
@@ -1116,16 +1188,52 @@ const HistoryStepItem = ({ step, idx, isLast }: any) => {
                             transition={{ duration: 0.2 }}
                             style={{ overflow: 'hidden' }}
                         >
-                            <div style={{
-                                fontSize: 14, fontWeight: 500, color: 'var(--text-primary)',
-                                lineHeight: 1.5, paddingTop: 4
-                            }}>
-                                {step.content}
+                            <div style={{ paddingTop: 4 }}>
+                                {isEditing ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <textarea
+                                            autoFocus
+                                            value={editedContent}
+                                            onChange={(e) => setEditedContent(e.target.value)}
+                                            style={{
+                                                width: '100%', padding: 8, fontSize: 14, borderRadius: 8,
+                                                border: '1.5px solid var(--accent-blue)', outline: 'none',
+                                                background: 'white', color: 'var(--text-primary)',
+                                                fontFamily: 'inherit', resize: 'vertical'
+                                            }}
+                                            rows={3}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            <button
+                                                onClick={handleSave}
+                                                style={{ flex: 1, padding: '6px 0', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700 }}
+                                            >
+                                                Сохранить
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setIsEditing(false); setEditedContent(step.content); }}
+                                                style={{ flex: 1, padding: '6px 0', background: '#f1f5f9', color: 'var(--text-secondary)', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700 }}
+                                            >
+                                                Отмена
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div style={{
+                                        fontSize: 14, fontWeight: 500, color: 'var(--text-primary)',
+                                        lineHeight: 1.5
+                                    }}>
+                                        {step.content}
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     ) : (
                         <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span>Нажми, чтобы прочитать...</span>
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {step.content ? (step.content.length > 40 ? step.content.slice(0, 40) + '...' : step.content) : 'Нажми, чтобы прочитать...'}
+                            </span>
                         </div>
                     )}
                 </AnimatePresence>

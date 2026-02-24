@@ -305,6 +305,26 @@ app.post('/api/steps', async (req: Request, res: Response) => {
     }
 });
 
+// Обновление шага
+app.put('/api/steps/:id', async (req: Request, res: Response) => {
+    const { content, evaluation, value, isKey } = req.body;
+    try {
+        const step = await prisma.step.update({
+            where: { id: Number(req.params.id) },
+            data: {
+                content,
+                evaluation,
+                value: value !== undefined ? parseFloat(value) : undefined,
+                isKey: isKey !== undefined ? Boolean(isKey) : undefined
+            }
+        });
+        res.json(step);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Ошибка обновления шага' });
+    }
+});
+
 // Удаление шага
 app.delete('/api/steps/:id', async (req: Request, res: Response) => {
     try {
