@@ -3,6 +3,10 @@
     "framework": "vite",
     "rewrites": [
         {
+            "source": "/api/:path*",
+            "destination": "/api/server.js?path=:path*"
+        },
+        {
             "source": "/((?!api/|src/|@|.*\\..*).*)",
             "destination": "/index.html"
         }

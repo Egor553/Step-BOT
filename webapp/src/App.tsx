@@ -1,12 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import WebApp from '@twa-dev/sdk';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Map, CheckCircle2, Briefcase, Phone, Plus, Star, ChevronLeft, Target, Gamepad2, Users, Trophy, Snowflake, Zap, Trash2, Edit2, MessageSquare, HandHelping, Lightbulb, Clock, LogOut, Gift, Mail, TrendingUp } from 'lucide-react';
+import { User, Map, CheckCircle2, Briefcase, Phone, Plus, Star, ChevronLeft, Target, Gamepad2, Users, Trophy, Snowflake, Zap, Trash2, Edit2, MessageSquare, HandHelping, Lightbulb, Clock, LogOut, Gift, Mail } from 'lucide-react';
 import axios from 'axios';
 import AnalyticsView from './components/AnalyticsView';
 // import { AuthView } from './AuthView'; // BACKUP - авторизация отключена
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = '/api';
+
+/**
+ * Безопасная обертка для алертов (с фоллбеком на браузерный alert)
+ */
+const safeAlert = (message: string) => {
+    try {
+        WebApp.showAlert(message);
+    } catch (e) {
+        alert(message);
+    }
+};
+
+/**
+ * Безопасная обертка для confirm (с фоллбеком на браузерный confirm)
+ */
+const safeConfirm = (message: string, callback: (ok: boolean) => void) => {
+    try {
+        WebApp.showConfirm(message, callback);
+    } catch (e) {
+        const ok = window.confirm(message);
+        callback(ok);
+    }
+};
+
+/**
+ * Безопасный вызов тактильной отдачи
+ */
+const safeHaptic = (type: 'success' | 'warning' | 'error' | 'light' | 'medium' | 'heavy' = 'light') => {
+    try {
+        if (['success', 'warning', 'error'].includes(type)) {
+            WebApp.HapticFeedback?.notificationOccurred(type as any);
+        } else {
+            WebApp.HapticFeedback?.impactOccurred(type as any);
+        }
+    } catch (e) {
+        // Игнорируем в браузере
+    }
+};
 
 type Step = { id: number; content: string; evaluation: string; isKey: boolean; createdAt: string };
 type Goal = { id: number; description: string; steps: Step[]; deadline: string; duration: number; status: string; startDate: string };
@@ -22,66 +60,57 @@ const BrandLogo = ({ size = 24, color = "currentColor" }: { size?: number, color
 );
 
 function App() {
-    const [tab, setTab] = useState('path'); // По умолчанию открываем карту пути
+    const [tab, setTab] = useState('path');
     const [userData, setUserData] = useState<any>(null);
     const [activeGoal, setActiveGoal] = useState<Goal | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+    // Получаем Telegram ID один раз
+    const getTgId = (): string => {
+        const tgUser = WebApp.initDataUnsafe?.user;
+        return tgUser?.id?.toString() || '12345678';
+    };
 
     useEffect(() => {
         try {
             WebApp.ready();
             WebApp.expand();
-            WebApp.headerColor = '#1E293B'; // Цвет шапки в тон верха
-            WebApp.backgroundColor = '#1E293B'; // Цвет фона (overscroll) в тон верха
+            WebApp.headerColor = '#1E3A8A';
+            WebApp.backgroundColor = '#1E3A8A';
         } catch (e) {
             console.log('Запущено вне Telegram');
         }
-
-        const tgUser = WebApp.initDataUnsafe?.user;
-        if (tgUser && tgUser.id) {
-            fetchUser(tgUser.id);
-        } else {
-            console.warn('Telegram ID не найден, использую тестовый: 12345678');
-            fetchUser(12345678);
-        }
+        fetchUser(getTgId());
     }, []);
 
-    const fetchUser = async (tgId: number) => {
+    const fetchUser = async (tgId: string) => {
         try {
-            const res = await axios.get(`${API_URL}/user/${tgId}`);
+            const user = WebApp.initDataUnsafe?.user;
+            const firstName = user?.first_name || '';
+            const username = user?.username || '';
+
+            const res = await axios.get(`${API_URL}/user/${tgId}`, {
+                params: { firstName, username }
+            });
             setUserData(res.data);
 
-            // Автоматическая авторизация по Telegram ID
-            setIsAuthenticated(true);
-
             if (res.data?.goals?.length > 0) {
-                // Goals are now sorted by createdAt DESC from API, so index 0 is the newest
                 setActiveGoal(res.data.goals.find((g: any) => g.status === 'ACTIVE') || res.data.goals[0]);
             }
         } catch (e) {
-            console.error(e);
+            console.error('[FETCH USER]', e);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleLoginSuccess = (telegramId: string) => {
-        setIsAuthenticated(true);
-        fetchUser(Number(telegramId));
-    };
-
-    const handleLogout = () => {
-        setIsAuthenticated(false);
-        setUserData(null);
-        setActiveGoal(null);
-    };
+    const refreshData = () => fetchUser(getTgId());
 
     if (loading) return (
         <div style={{
             position: 'fixed', inset: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'var(--bg-color)', zIndex: 9999
+            background: 'linear-gradient(180deg, #1E3A8A 0%, #2563EB 100%)', zIndex: 9999
         }}>
             <motion.div
                 animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
@@ -109,13 +138,13 @@ function App() {
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                 >
-                    {tab === 'profile' && <ProfileView user={userData} onSave={(id: any) => fetchUser(id || 12345678)} onLogout={handleLogout} />}
-                    {tab === 'path' && <PathView user={userData} onUpdate={() => fetchUser(userData?.telegramId || 12345678)} onNavigateToTracker={() => setTab('tracker')} />}
-                    {tab === 'tracker' && <TrackerView user={userData} goal={activeGoal} onUpdate={() => fetchUser(userData?.telegramId || 12345678)} />}
+                    {tab === 'profile' && <ProfileView user={userData} onSave={() => refreshData()} onNavigate={(t: string) => setTab(t)} />}
+                    {tab === 'analytics' && <AnalyticsView user={userData} />}
+                    {tab === 'path' && <PathView user={userData} onUpdate={refreshData} onNavigateToTracker={() => setTab('tracker')} />}
+                    {tab === 'tracker' && <TrackerView user={userData} goal={activeGoal} onUpdate={refreshData} />}
                     {tab === 'requests' && <RequestsView user={userData} />}
                     {tab === 'ideas' && <IdeasView user={userData} />}
                     {tab === 'partners' && <PartnersView />}
-                    {tab === 'stats' && <AnalyticsView user={userData} />}
                 </motion.div>
             </AnimatePresence>
 
@@ -129,17 +158,8 @@ function App() {
                 <div className={`nav-item ${tab === 'path' ? 'active' : ''}`} onClick={() => setTab('path')}>
                     <Map size={22} /> <span>Путь</span>
                 </div>
-                <div className={`nav-item ${tab === 'requests' ? 'active' : ''}`} onClick={() => setTab('requests')}>
-                    <MessageSquare size={22} /> <span>Запросы</span>
-                </div>
                 <div className={`nav-item ${tab === 'partners' ? 'active' : ''}`} onClick={() => setTab('partners')}>
                     <Users size={22} /> <span>Досуг</span>
-                </div>
-                <div className={`nav-item ${tab === 'ideas' ? 'active' : ''}`} onClick={() => setTab('ideas')}>
-                    <Lightbulb size={22} /> <span>Идея</span>
-                </div>
-                <div className={`nav-item ${tab === 'stats' ? 'active' : ''}`} onClick={() => setTab('stats')}>
-                    <TrendingUp size={22} /> <span>Стата</span>
                 </div>
             </nav>
         </div>
@@ -147,14 +167,17 @@ function App() {
 }
 
 // --- ВИД: Профиль ---
-const ProfileView = ({ user, onSave, onLogout }: any) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [syncCode, setSyncCode] = useState('');
-    const [isSyncing, setIsSyncing] = useState(false);
+const ProfileView = ({ user, onSave, onNavigate }: any) => {
+    // Данные из Telegram SDK (автозаполнение)
+    const tgUser = WebApp.initDataUnsafe?.user;
+    const tgFirstName = tgUser?.first_name || '';
+    const tgUsername = tgUser?.username || '';
+
+    const [isEditing, setIsEditing] = useState(!user?.firstName); // Если нет имени — сразу редактирование
     const [loading, setLoading] = useState(false);
 
     const [form, setForm] = useState({
-        firstName: user?.firstName || '',
+        firstName: user?.firstName || tgFirstName || '',
         lastName: user?.lastName || '',
         occupation: user?.occupation || '',
         phone: user?.phone || '',
@@ -164,79 +187,41 @@ const ProfileView = ({ user, onSave, onLogout }: any) => {
     useEffect(() => {
         if (user) {
             setForm({
-                firstName: user.firstName || '',
+                firstName: user.firstName || tgFirstName || '',
                 lastName: user.lastName || '',
                 occupation: user.occupation || '',
                 phone: user.phone || '',
                 notificationTime: user.notificationTime || '20:00'
             });
+            // Если имя уже есть — не нужно редактировать
+            if (user.firstName) setIsEditing(false);
         }
     }, [user]);
 
-    const handleSync = async () => {
-        if (!syncCode) return WebApp.showAlert('Введите код!');
-        setIsSyncing(true);
-        try {
-            const res = await axios.post(`${API_URL}/auth/sync-code`, { code: syncCode });
-            WebApp.HapticFeedback?.notificationOccurred('success');
-            WebApp.showAlert('✅ Авторизация успешна! Добро пожаловать.');
-            setTimeout(() => window.location.reload(), 1500);
-        } catch (e: any) {
-            WebApp.showAlert(e.response?.data?.error || 'Ошибка кода');
-        } finally {
-            setIsSyncing(false);
-        }
-    };
 
     const handleSave = async () => {
         setLoading(true);
         try {
-            const tgId = WebApp.initDataUnsafe.user?.id || 12345678;
-            await axios.post(`${API_URL}/user/profile`, { telegramId: tgId, ...form });
-            WebApp.HapticFeedback?.notificationOccurred('success');
-            onSave(tgId);
+            const rawTgId = tgUser?.id || 12345678;
+            const tgIdString = rawTgId.toString();
+
+            await axios.post(`${API_URL}/user/profile`, {
+                telegramId: tgIdString,
+                ...form
+            });
+
+            safeHaptic('success');
+            onSave();
             setIsEditing(false);
-            WebApp.showAlert('Профиль обновлен! ✅');
+            safeAlert('Профиль обновлен! ✅');
         } catch (e) {
-            WebApp.showAlert('Ошибка при сохранении');
+            console.error('[SAVE ERROR]:', e);
+            safeAlert('Ошибка при сохранении');
         } finally {
             setLoading(false);
         }
     };
 
-    // --- 1. ЕСЛИ НЕТ ИМЕНИ ---
-    if (!user?.firstName) {
-        return (
-            <div className="card" style={{ marginTop: 40, padding: '32px 24px', textAlign: 'center' }}>
-                <div style={{
-                    width: 80, height: 80, borderRadius: 24,
-                    background: 'linear-gradient(135deg, #1E3A8A, #2563EB)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px',
-                    boxShadow: '0 8px 24px rgba(37, 99, 235, 0.3)'
-                }}>
-                    <BrandLogo size={42} color="white" />
-                </div>
-                <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>Вход в ШАГ</h2>
-                <div style={{ background: '#f8faff', padding: 24, borderRadius: 24, border: '1px solid #eef2ff', marginTop: 32 }}>
-                    <input
-                        type="text"
-                        placeholder="000 000"
-                        value={syncCode}
-                        onChange={(e) => setSyncCode(e.target.value)}
-                        style={{
-                            width: '100%', padding: '16px', borderRadius: 16, border: '2px solid var(--accent-blue)',
-                            fontSize: 24, textAlign: 'center', fontWeight: 800, letterSpacing: 4, marginBottom: 16,
-                            background: 'white', color: 'var(--text-primary)'
-                        }}
-                    />
-                    <button className="primary" onClick={handleSync} disabled={isSyncing} style={{ width: '100%' }}>
-                        {isSyncing ? '...' : 'ВОЙТИ'}
-                    </button>
-                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 16 }}>Напиши <b>/start</b> боту</p>
-                </div>
-            </div>
-        );
-    }
 
     // --- 2. РЕЖИМ РЕДАКТИРОВАНИЯ ---
     if (isEditing) {
@@ -298,6 +283,31 @@ const ProfileView = ({ user, onSave, onLogout }: any) => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+                    {/* Бонусная система: 12 месяцев */}
+                    {(() => {
+                        const completedGoals = user?.goals?.filter((g: any) => g.status === 'COMPLETED') || [];
+                        const totalMonths = completedGoals.reduce((sum: number, g: any) => sum + (g.duration || 0), 0);
+                        const progress = Math.min((totalMonths / 12) * 100, 100);
+                        return (
+                            <div style={{ background: 'linear-gradient(135deg, #1E3A8A, #2563EB)', padding: 16, borderRadius: 16, color: 'white', marginBottom: 4 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Trophy size={18} color="#F59E0B" />
+                                        <span style={{ fontWeight: 800, fontSize: 13, textTransform: 'uppercase' }}>Путь к награде</span>
+                                    </div>
+                                    <div style={{ fontWeight: 800, fontSize: 13, color: '#F59E0B' }}>{totalMonths} / 12 мес.</div>
+                                </div>
+                                <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.2)', overflow: 'hidden' }}>
+                                    <div style={{ width: `${progress}%`, height: '100%', background: '#F59E0B', borderRadius: 4 }} />
+                                </div>
+                                <div style={{ fontSize: 11, opacity: 0.8, marginTop: 10, lineHeight: 1.3 }}>
+                                    Суммируй 12 месяцев завершённых целей, чтобы получить уникальный подарок и особое признание.
+                                </div>
+                            </div>
+                        );
+                    })()}
+
                     {/* Блок Пользователь */}
                     <div style={{ background: 'rgba(37, 99, 235, 0.04)', padding: 16, borderRadius: 16, border: '1px solid rgba(37, 99, 235, 0.1)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -328,15 +338,30 @@ const ProfileView = ({ user, onSave, onLogout }: any) => {
                         <div style={{ fontSize: 15, fontWeight: 600 }}>{user.phone || `@${user.username}` || 'Не указано'}</div>
                     </div>
 
+                    {/* Дополнительные разделы (Запросы, Идея) */}
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {/* Итоги скрыты по просьбе Вани (в хранении) */}
+
+                        <div onClick={() => onNavigate('requests')} style={{ background: 'white', padding: 16, borderRadius: 16, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <div style={{ background: 'rgba(37,99,235,0.1)', padding: 8, borderRadius: 10, color: 'var(--accent-blue)' }}><MessageSquare size={18} /></div>
+                                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Связь с проектом</span>
+                            </div>
+                            <span style={{ color: 'var(--text-muted)' }}>→</span>
+                        </div>
+
+                        <div onClick={() => onNavigate('ideas')} style={{ background: 'white', padding: 16, borderRadius: 16, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <div style={{ background: 'rgba(37,99,235,0.1)', padding: 8, borderRadius: 10, color: 'var(--accent-blue)' }}><Lightbulb size={18} /></div>
+                                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Предложить идею</span>
+                            </div>
+                            <span style={{ color: 'var(--text-muted)' }}>→</span>
+                        </div>
+                    </div>
+
                     <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-                        <button onClick={() => confirm('Выйти?') && onLogout()} style={{
-                            flex: 1, background: '#FEF2F2', border: '1px solid #FECACA', color: '#EF4444',
-                            padding: '14px', borderRadius: '14px', fontWeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center'
-                        }}>
-                            <LogOut size={18} />
-                        </button>
                         <button onClick={() => setIsEditing(true)} style={{
-                            flex: 4, background: 'white', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                            flex: 1, background: 'white', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
                             padding: '14px', borderRadius: '14px', fontWeight: 700
                         }}>
                             Редактировать
@@ -375,109 +400,86 @@ const GoalChart = ({ steps, metric }: { steps: any[], metric?: string }) => {
     const activePoints = mode === 'PATH' ? allPathPoints : metricPoints;
 
     const width = 300;
-    const height = 140;
-    const padding = 15;
+    const height = 180; // Чуть выше для красоты
+    const padding = 20;
 
     // Если данных мало
     if (activePoints.length < 2 && mode === 'PATH') return null;
-    if (activePoints.length < 2 && mode === 'METRIC') {
-        return metric ? (
-            <div style={{ marginTop: 24, padding: '16px 12px', background: '#f8fafc', borderRadius: 16, border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{metric}</span>
-                <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Пока недостаточно данных для графика</p>
-                {metricSteps.length > 0 && <p style={{ fontSize: 24, fontWeight: 800, marginTop: 4 }}>{metricSteps[metricSteps.length - 1].value}</p>}
-                <button onClick={() => setMode('PATH')} style={{ marginTop: 8, fontSize: 11, color: 'var(--accent-blue)', background: 'none', border: 'none' }}>Показать Путь</button>
-            </div>
-        ) : null;
-    }
+    if (activePoints.length < 2 && mode === 'METRIC') return null;
 
     const minY = Math.min(...activePoints.map(p => p.y));
     const maxY = Math.max(...activePoints.map(p => p.y));
-    const rangeY = Math.max(maxY - minY, mode === 'METRIC' ? (maxY * 0.1 || 10) : 2); // Немного отступа для метрики
+    const rangeY = Math.max(maxY - minY, mode === 'METRIC' ? (maxY * 0.1 || 10) : 2);
 
-    // Рассчитываем координаты
-    const getX = (index: number) => padding + index * ((width - 2 * padding) / (activePoints.length - 1));
-    const getY = (val: number) => height - padding - ((val - minY) / rangeY) * (height - 2 * padding);
+    const getX = (index: number) => padding + (index + 1) * ((width - 2 * padding) / (activePoints.length));
+    const getY = (val: number) => height - padding - 40 - ((val - minY) / rangeY) * (height - 2 * padding - 60);
 
     const svgPath = activePoints.map((p, i) =>
         `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(p.y)}`
     ).join(' ');
 
     return (
-        <div style={{ marginTop: 24, padding: '16px 12px', background: '#f8fafc', borderRadius: 16, border: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                        onClick={() => setMode('PATH')}
-                        style={{ fontSize: 11, fontWeight: 800, color: mode === 'PATH' ? 'var(--accent-blue)' : 'var(--text-muted)', textTransform: 'uppercase', background: 'none', border: 'none', padding: 0, opacity: mode === 'PATH' ? 1 : 0.5 }}
-                    >
-                        ПУТЬ
-                    </button>
-                    {metric && (
-                        <>
-                            <span style={{ color: '#cbd5e1' }}>|</span>
-                            <button
-                                onClick={() => setMode('METRIC')}
-                                style={{ fontSize: 11, fontWeight: 800, color: mode === 'METRIC' ? 'var(--accent-blue)' : 'var(--text-muted)', textTransform: 'uppercase', background: 'none', border: 'none', padding: 0, opacity: mode === 'METRIC' ? 1 : 0.5 }}
-                            >
-                                {metric}
-                            </button>
-                        </>
-                    )}
+        <div style={{
+            marginTop: 20,
+            padding: '20px 16px',
+            background: 'rgba(248, 250, 252, 0.8)',
+            borderRadius: 24,
+            border: '1.5px solid #edf2f7'
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    ДИНАМИКА ПУТИ
                 </div>
-                <span style={{ fontSize: 10, color: '#94a3b8', background: '#e2e8f0', padding: '2px 6px', borderRadius: 6 }}>
-                    {mode === 'PATH' ? 'Нажми на точку' : 'Значения'}
-                </span>
+                <div style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    color: '#94a3b8',
+                    background: '#e2e8f0',
+                    padding: '4px 10px',
+                    borderRadius: 10,
+                    opacity: 0.8
+                }}>
+                    Нажми на точку
+                </div>
             </div>
 
-            <div style={{ position: 'relative', height: height }}>
-                <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} style={{ overflow: 'visible' }}>
-                    {/* Сетка (линия старта / нуля) */}
-                    {mode === 'PATH' ? (
-                        <line x1={padding} y1={getY(0)} x2={width - padding} y2={getY(0)} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4 4" />
-                    ) : (
-                        // Для метрики можно добавить линии сетки
-                        [0, 0.5, 1].map(k => {
-                            const yVal = minY + (maxY - minY) * k;
-                            return <line key={k} x1={padding} y1={getY(yVal)} x2={width - padding} y2={getY(yVal)} stroke="#e2e8f0" strokeWidth="1" />
-                        })
-                    )}
+            <div style={{ position: 'relative', height: height - 40 }}>
+                <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height - 40}`} style={{ overflow: 'visible' }}>
+                    {/* Пунктирная линия нуля */}
+                    <line
+                        x1={padding} y1={getY(0)}
+                        x2={width - padding} y2={getY(0)}
+                        stroke="#cbd5e1" strokeWidth="1.5"
+                        strokeDasharray="4 4"
+                    />
 
-                    {/* График */}
-                    <path d={svgPath} fill="none" stroke="var(--accent-blue)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    {/* Линия пути */}
+                    <path
+                        d={svgPath}
+                        fill="none"
+                        stroke="#3B82F6"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
 
                     {/* Точки */}
                     {activePoints.map((p, i) => {
-                        let color = '#3B82F6';
-                        let stroke = 'white';
-                        let r = 5;
-
-                        if (mode === 'PATH') {
-                            if (i === 0) color = '#94a3b8';
-                            else {
-                                if (p.step.evaluation === 'GREEN') color = '#10B981';
-                                if (p.step.evaluation === 'RED') color = '#EF4444';
-                                if (p.step.evaluation === 'YELLOW') color = '#F59E0B';
-                            }
-                        } else {
-                            // METRIC
-                            color = '#8B5CF6';
-                        }
+                        let color = '#94a3b8'; // Старт
+                        if (p.step.evaluation === 'GREEN') color = '#10B981';
+                        if (p.step.evaluation === 'RED') color = '#EF4444';
+                        if (p.step.evaluation === 'YELLOW') color = '#F59E0B';
 
                         return (
-                            <motion.g
-                                key={i}
-                                initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: i * 0.1 }}
-                                onClick={() => {
-                                    if (i === 0 && mode === 'PATH') return;
-                                    const valText = mode === 'METRIC' ? `\n📊 ${p.y}` : '';
-                                    WebApp.showAlert(`${p.step.evaluation === 'GREEN' ? '📈' : p.step.evaluation === 'RED' ? '🔻' : '⏳'} ${new Date(p.step.createdAt).toLocaleDateString()}:\n\n${p.step.content}${valText}`)
-                                }}
-                            >
-                                <circle cx={getX(i)} cy={getY(p.y)} r={r} fill={color} stroke="white" strokeWidth={2} style={{ cursor: 'pointer' }} />
-                                {/* Тень для кликабельности */}
-                                <circle cx={getX(i)} cy={getY(p.y)} r={12} fill="transparent" style={{ cursor: 'pointer' }} />
-                            </motion.g>
+                            <g key={i} onClick={() => safeAlert(p.step.content)}>
+                                <circle
+                                    cx={getX(i)} cy={getY(p.y)} r="6"
+                                    fill={color}
+                                    stroke="white"
+                                    strokeWidth="2.5"
+                                    style={{ cursor: 'pointer', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
+                                />
+                            </g>
                         );
                     })}
                 </svg>
@@ -703,21 +705,21 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
 
     const handleDeleteGoal = async (e: React.MouseEvent, id: number) => {
         e.stopPropagation();
-        WebApp.showConfirm('Удалить эту цель и все её шаги?', async (confirmed) => {
+        safeConfirm('Удалить эту цель и все её шаги?', async (confirmed) => {
             if (confirmed) {
                 try {
                     await axios.delete(`${API_URL}/goals/${id}`);
-                    WebApp.showAlert('Цель удалена 🗑️');
+                    safeAlert('Цель удалена 🗑️');
                     onUpdate();
                 } catch (e) {
-                    WebApp.showAlert('Ошибка удаления');
+                    safeAlert('Ошибка удаления');
                 }
             }
         });
     };
 
     const handleStep = async (goalId: number) => {
-        if (!stepText || isSaving) return WebApp.showAlert('Опиши свой шаг!');
+        if (!stepText || isSaving) return safeAlert('Опиши свой шаг!');
         setIsSaving(true);
         try {
             await axios.post(`${API_URL}/steps`, {
@@ -731,11 +733,11 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
             setStepValue('');
             setStepEval('GREEN');
             setSelectedGoal(null);
-            WebApp.HapticFeedback.notificationOccurred(stepEval === 'GREEN' ? 'success' : 'warning');
-            WebApp.showAlert(stepEval === 'GREEN' ? 'Отличный прогресс! 🚀' : 'Опыт — лучший учитель 💪');
+            safeHaptic(stepEval === 'GREEN' ? 'success' : 'warning');
+            safeAlert(stepEval === 'GREEN' ? 'Отличный прогресс! 🚀' : 'Опыт — лучший учитель 💪');
             onUpdate();
         } catch (e) {
-            WebApp.showAlert('Ошибка при добавлении');
+            safeAlert('Ошибка при добавлении');
         } finally {
             setIsSaving(false);
         }
@@ -743,11 +745,11 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
 
     const handleDeleteStep = async (e: React.MouseEvent, id: number) => {
         e.stopPropagation();
-        WebApp.showConfirm('Удалить этот шаг?', async (confirmed) => {
+        safeConfirm('Удалить этот шаг?', async (confirmed) => {
             if (confirmed) {
                 try {
                     await axios.delete(`${API_URL}/steps/${id}`);
-                    WebApp.showAlert('Шаг удален 🗑️');
+                    safeAlert('Шаг удален 🗑️');
                     onUpdate();
                     // Если удаленный шаг был частью выбранной цели, обновляем её данные локально
                     if (selectedGoal) {
@@ -757,7 +759,7 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
                         });
                     }
                 } catch (e) {
-                    WebApp.showAlert('Ошибка удаления');
+                    safeAlert('Ошибка удаления');
                 }
             }
         });
@@ -767,7 +769,7 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
         try {
             await axios.put(`${API_URL}/steps/${id}`, { content: newContent });
             onUpdate();
-            WebApp.HapticFeedback?.notificationOccurred('success');
+            safeHaptic('success');
             // Обновляем локально
             if (selectedGoal) {
                 setSelectedGoal({
@@ -776,7 +778,7 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
                 });
             }
         } catch (e) {
-            WebApp.showAlert('Ошибка обновления');
+            safeAlert('Ошибка обновления');
         }
     };
 
@@ -806,7 +808,7 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
     );
 
     return (
-        <div style={{ marginTop: 50, paddingBottom: 100, paddingLeft: 16, paddingRight: 16 }}>
+        <div style={{ paddingTop: 50, paddingBottom: 100, paddingLeft: 16, paddingRight: 16 }}>
             <div style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40, paddingLeft: 0 }}>
                     <BrandLogo size={34} color="white" />
@@ -831,13 +833,13 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
                 </div>
 
                 {!selectedGoal && (
-                    <div style={{ display: 'flex', gap: 8, background: 'rgba(0,0,0,0.05)', padding: 4, borderRadius: 14 }}>
+                    <div style={{ display: 'flex', gap: 8, background: 'transparent', padding: 4, borderRadius: 14 }}>
                         <button
                             onClick={() => setPathTab('active')}
                             style={{
                                 flex: 1, height: 36, borderRadius: 10, border: 'none',
                                 background: pathTab === 'active' ? 'white' : 'transparent',
-                                color: pathTab === 'active' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                color: pathTab === 'active' ? 'var(--text-primary)' : 'rgba(255, 255, 255, 0.6)',
                                 fontWeight: 800, fontSize: 12, boxShadow: pathTab === 'active' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
                                 transition: '0.2s'
                             }}
@@ -849,7 +851,7 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
                             style={{
                                 flex: 1, height: 36, borderRadius: 10, border: 'none',
                                 background: pathTab === 'completed' ? 'white' : 'transparent',
-                                color: pathTab === 'completed' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                color: pathTab === 'completed' ? 'var(--text-primary)' : 'rgba(255, 255, 255, 0.6)',
                                 fontWeight: 800, fontSize: 12, boxShadow: pathTab === 'completed' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
                                 transition: '0.2s'
                             }}
@@ -874,7 +876,7 @@ const PathView = ({ user, onUpdate, onNavigateToTracker }: any) => {
                             {/* Информация о цели */}
                             <div className="card" style={{ padding: 20 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                                    <div style={{ padding: '4px 10px', background: 'rgba(0,0,0,0.04)', borderRadius: 8, fontSize: 11, fontWeight: 800, color: 'var(--text-secondary)' }}>
+                                    <div style={{ padding: '4px 10px', background: 'rgba(37,99,235,0.06)', borderRadius: 8, fontSize: 11, fontWeight: 800, color: 'var(--text-secondary)' }}>
                                         {selectedGoal.category === 'BUSINESS' ? '💼 ДЕЛОВАЯ' : '👤 ЛИЧНАЯ'}
                                     </div>
                                     <div style={{
@@ -1249,7 +1251,7 @@ const RequestsView = ({ user }: any) => {
     const [isSending, setIsSending] = useState(false);
 
     const handleSubmit = async () => {
-        if (!text.trim()) return WebApp.showAlert('Напишите что-нибудь!');
+        if (!text.trim()) return safeAlert('Напишите что-нибудь!');
         setIsSending(true);
         try {
             const tgUser = WebApp.initDataUnsafe?.user;
@@ -1260,9 +1262,9 @@ const RequestsView = ({ user }: any) => {
                 content: text
             });
             setText('');
-            WebApp.showAlert('Отправлено! Мы напишем тебе лично в течение 3 дней.');
+            safeAlert('Отправлено! Мы напишем тебе лично в течение 3 дней.');
         } catch (e) {
-            WebApp.showAlert('Ошибка отправки');
+            safeAlert('Ошибка отправки');
         } finally {
             setIsSending(false);
         }
@@ -1359,13 +1361,13 @@ const TrackerView = ({ user, onUpdate }: any) => {
 
     const handleCreateGoal = async () => {
         if (!text || (showCalendar && !customDate)) {
-            WebApp.showAlert('Заполни все поля!');
+            safeAlert('Заполни все поля!');
             return;
         }
 
         setIsSaving(true);
         try {
-            const tgId = WebApp.initDataUnsafe.user?.id || 12345678;
+            const tgId = WebApp.initDataUnsafe?.user?.id?.toString() || '12345678';
             await axios.post(`${API_URL}/goals`, {
                 telegramId: tgId,
                 description: text,
@@ -1376,12 +1378,14 @@ const TrackerView = ({ user, onUpdate }: any) => {
             });
             setText('');
             setMetricName('');
-            WebApp.HapticFeedback?.notificationOccurred('success');
-            WebApp.showAlert('🎯 Цель поставлена! Теперь делай ШАГИ во вкладке «Путь».');
+            safeHaptic('success');
+            safeAlert('🎯 Цель поставлена! Теперь делай ШАГИ во вкладке «Путь».');
             onUpdate();
         } catch (e: any) {
-            const errorMsg = e.response?.data?.error || 'Ошибка при создании цели';
-            WebApp.showAlert(errorMsg);
+            console.error('[GOAL ERROR]', e);
+            const status = e.response?.status ? `[${e.response.status}] ` : '';
+            const errorMsg = e.response?.data?.error || e.message || 'Ошибка сети';
+            safeAlert(`${status}Ошибка: ${errorMsg}`);
         } finally {
             setIsSaving(false);
         }
@@ -1437,7 +1441,7 @@ const TrackerView = ({ user, onUpdate }: any) => {
                 </div>
             </div>
 
-            <div style={{ background: 'rgba(0,0,0,0.02)', borderRadius: 20, padding: 16, border: '1px solid var(--border-color)', marginBottom: 24 }}>
+            <div style={{ background: 'rgba(37,99,235,0.03)', borderRadius: 20, padding: 16, border: '1px solid var(--border-color)', marginBottom: 24 }}>
                 <textarea
                     placeholder="Например: Прочитать 10 книг или запустить проект..."
                     rows={4}
@@ -1687,7 +1691,7 @@ const PartnersView = () => {
                             <span style={{ fontWeight: 800, fontSize: 18 }}>{p.title}</span>
                             <span style={{
                                 fontSize: 10,
-                                background: 'rgba(0,0,0,0.05)',
+                                background: 'rgba(255,255,255,0.05)',
                                 padding: '2px 8px',
                                 borderRadius: 10,
                                 fontWeight: 700,

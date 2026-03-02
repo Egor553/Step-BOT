@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Trophy, Users, Target, CheckCircle, Footprints, TrendingUp } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = '/api';
 
 // --- ВИД: Аналитика ---
 const AnalyticsView = ({ user }: any) => {
@@ -61,7 +61,7 @@ const AnalyticsView = ({ user }: any) => {
             {/* === ГЛОБАЛЬНАЯ СТАТИСТИКА ПЛАТФОРМЫ === */}
             <div style={{ marginBottom: 24 }}>
                 <h3 style={{ fontSize: 16, fontWeight: 800, color: 'white', marginBottom: 14, paddingLeft: 2 }}>
-                    📊 Статистика платформы
+                    Статистика платформы
                 </h3>
 
                 {loadingStats ? (
@@ -182,6 +182,51 @@ const AnalyticsView = ({ user }: any) => {
                         <span style={{ fontSize: 18, fontWeight: 800 }}>{total}</span>
                     </div>
 
+                    {/* ЛИНЕЙНЫЙ ГРАФИК ОБЩЕГО ПРОГРЕССА */}
+                    {total > 1 && (
+                        <div style={{ height: 120, width: '100%', marginTop: 10, marginBottom: 10, position: 'relative' }}>
+                            <svg width="100%" height="100%" viewBox="0 0 300 100" preserveAspectRatio="none">
+                                <defs>
+                                    <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#10B981" stopOpacity="0.2" />
+                                        <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
+                                    </linearGradient>
+                                </defs>
+                                {(() => {
+                                    const points = filteredSteps
+                                        .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                                        .reduce((acc: any[], step: any) => {
+                                            const lastVal = acc.length > 0 ? acc[acc.length - 1].v : 0;
+                                            const change = step.evaluation === 'GREEN' ? 1 : (step.evaluation === 'RED' ? -1 : 0);
+                                            acc.push({ v: lastVal + change });
+                                            return acc;
+                                        }, [{ v: 0 }]);
+
+                                    const maxV = Math.max(...points.map((p: any) => p.v), 1);
+                                    const minV = Math.min(...points.map((p: any) => p.v), -1);
+                                    const range = maxV - minV || 1;
+
+                                    const getX = (i: number) => (i * 300) / (points.length - 1);
+                                    const getY = (v: number) => 100 - ((v - minV) * 100) / range;
+
+                                    const d = points.map((p: any, i: number) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(p.v)}`).join(' ');
+                                    const areaD = `${d} L 300 100 L 0 100 Z`;
+
+                                    return (
+                                        <>
+                                            <path d={areaD} fill="url(#lineGrad)" />
+                                            <path d={d} fill="none" stroke="#10B981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                            {points.map((p: any, i: number) => (
+                                                <circle key={i} cx={getX(i)} cy={getY(p.v)} r="3" fill="#10B981" />
+                                            ))}
+                                        </>
+                                    );
+
+                                })()}
+                            </svg>
+                        </div>
+                    )}
+
                     <div style={{ height: 12, borderRadius: 6, background: '#f1f5f9', overflow: 'hidden', display: 'flex' }}>
                         {total > 0 ? (
                             <>
@@ -196,10 +241,11 @@ const AnalyticsView = ({ user }: any) => {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981' }} /> {green} Вперёд</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F59E0B' }} /> {yellow} Ожидание</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F59E0B' }} /> {yellow} Ждём</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444' }} /> {red} Назад</div>
                     </div>
                 </div>
+
             </div>
 
             {/* Детализация по целям */}

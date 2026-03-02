@@ -1,8 +1,9 @@
 :root {
-  --bg-gradient-top: #1E293B;
-  /* Глубокий синий сланец */
+  --bg-gradient-top: #1E3A8A;
+  /* Насыщенный глубокий синий */
   --bg-gradient-bottom: #2563EB;
-  /* Насыщенный королевский синий */
+  /* Королевский синий */
+  --bg-color: #1E3A8A;
   --bg-card: #ffffff;
   --bg-glass: rgba(255, 255, 255, 0.95);
   --accent-blue: #3B82F6;
@@ -17,8 +18,10 @@
   --border-color: rgba(37, 99, 235, 0.1);
   --brand-gradient: linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%);
   --shadow-glow: 0 10px 40px rgba(37, 99, 235, 0.2);
-  --font-main: 'Plus Jakarta Sans', sans-serif;
-  --font-display: 'Outfit', sans-serif;
+  --font-main: 'Plus Jakarta Sans',
+    sans-serif;
+  --font-display: 'Outfit',
+    sans-serif;
 }
 
 * {
@@ -28,13 +31,27 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Скрыть полосу прокрутки для Chrome, Safari и Opera */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Скрыть полосу прокрутки для IE, Edge и Firefox */
+* {
+  -ms-overflow-style: none;
+  /* IE и Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
 html {
-  background: #1E293B;
+  background: var(--bg-gradient-top);
 }
 
 body {
-  background: linear-gradient(180deg, var(--bg-gradient-top) 0%, var(--bg-gradient-bottom) 100%);
+  background: linear-gradient(180deg, #1E3A8A 0%, #2563EB 100%);
   background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--text-primary);
   font-family: var(--font-main);
   line-height: 1.5;
